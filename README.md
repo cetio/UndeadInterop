@@ -20,6 +20,8 @@ It started after reading secret.club's writeup on BattlEye's usermode API hooks 
 
 ## Usage
 
+UndeadInterop doesn't provide any type interop for syscalls, so you'll need to define your own delegates, and compatibility with the Windows syscall ABI and architecture is your responsibility.
+
 Define a delegate matching the syscall signature and attribute it with `NtImport`:
 
 ```csharp
