@@ -187,7 +187,7 @@ namespace UndeadInterop
             shellcode[4] = (byte)(id >> 0);  // byte 1
             shellcode[5] = (byte)(id >> 8);  // byte 2
             shellcode[6] = (byte)(id >> 16); // byte 3
-            shellcode[7] = (byte)(id >> 32); // byte 4
+            shellcode[7] = (byte)(id >> 24); // byte 4
 
             // syscall eax
             shellcode[8] = 0x0f;
