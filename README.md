@@ -15,7 +15,7 @@ It started after reading secret.club's writeup on BattlEye's usermode API hooks 
 - **Export walking** - Parses the PE export directory of a loaded module to enumerate `Nt*`/`Zw*` functions without relying on static offsets
 - **Syscall resolution** - Derives syscall IDs from export order, falling back to forwarded addresses when present
 - **Direct syscalls** - Generates small shellcode stubs at runtime and marshals them to typed delegates, so syscalls can be called like normal .NET methods
-- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.INLINE_JMP`, `INLINE_CALL`, `INLINE_WARP`, `DEBUG_INT`, `DEBUG_PRK`, or `FORWARDED`
+- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.InlineJmp`, `InlineCall`, `InlineWarp`, `DebugInt`, `DebugPrk`, or `Forwarded`
 - **Shared export handling** - Tracks `Nt`/`Zw` pairs so identifiers stay consistent with the real syscall table
 
 ## Usage

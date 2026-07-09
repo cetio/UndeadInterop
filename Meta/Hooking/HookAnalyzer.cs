@@ -6,17 +6,17 @@ namespace UndeadInterop.Meta.Hooking
     {
         public static unsafe HookType GetHookType(this ExportFunction function)
         {
-            HookType hookType = HookType.NONE;
+            HookType hookType = HookType.None;
             List<FunctionBlock> blocks = function.ReadInstructions();
 
             // no code detected, forwarded export address
             if (blocks.Count == 0)
-                return HookType.FORWARDED;
+                return HookType.Forwarded;
 
             foreach (FunctionBlock block in blocks)
             {
                 if (block.PageProtect != 0x20 || block.PageState != 0x1000)
-                    return HookType.DEBUG_PRK;
+                    return HookType.DebugPrk;
 
                 foreach (Instruction instruction in block.Instructions)
                 {
@@ -26,13 +26,13 @@ namespace UndeadInterop.Meta.Hooking
                         instruction.FlowControl == FlowControl.IndirectBranch) &&
                         instruction.IsForwarded())
                     {
-                        hookType = HookType.INLINE_JMP;
+                        hookType = HookType.InlineJmp;
                     }
                     // instruction will execute code outside of module
                     else if (instruction.IsExecutor() &&
                         instruction.IsForwarded())
                     {
-                        hookType = HookType.INLINE_CALL;
+                        hookType = HookType.InlineCall;
                     }
                     // instruction modifies return address (likely)
                     else if ((instruction.Op0Kind == OpKind.Immediate64 &&
@@ -43,18 +43,18 @@ namespace UndeadInterop.Meta.Hooking
                         instruction.MemoryDisplacement64 >= 8 &&
                         instruction.MemoryDisplacement64 <= 24))
                     {
-                        hookType = HookType.INLINE_WARP;
+                        hookType = HookType.InlineWarp;
                     }
                     // instruction forces an interrupt
                     else if (instruction.FlowControl == FlowControl.Interrupt &&
                         instruction.Immediate8 != 0x2e)
                     {
-                        hookType = HookType.DEBUG_INT;
+                        hookType = HookType.DebugInt;
                     }
                     // instruction forces an exception
                     else if (instruction.FlowControl == FlowControl.Exception)
                     {
-                        hookType = HookType.DEBUG_PRK;
+                        hookType = HookType.DebugPrk;
                     }
                 }
             }

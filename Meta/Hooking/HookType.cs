@@ -2,12 +2,12 @@
 {
     public enum HookType
     {
-        NONE,
-        INLINE_JMP,
-        INLINE_CALL,
-        INLINE_WARP,
-        DEBUG_INT,
-        DEBUG_PRK,
-        FORWARDED
+        None,
+        InlineJmp,
+        InlineCall,
+        InlineWarp,
+        DebugInt,
+        DebugPrk,
+        Forwarded
     }
 }

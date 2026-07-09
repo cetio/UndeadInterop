@@ -32,7 +32,7 @@ namespace UndeadInterop
                     ?? throw new ArgumentException("The provided delegate was not attributed with NtImport");
             ExportFunction function = GetFunctions().Where(x => x.Name == (import.Entrypoint ?? typeof(T).Name)).FirstOrDefault();
 
-            return (T)PrepCall_Explicit(import.Entrypoint ?? typeof(T).Name, typeof(T));
+            return (T)PrepCallExplicit(import.Entrypoint ?? typeof(T).Name, typeof(T));
         }
 
         /// <summary>
@@ -57,10 +57,10 @@ namespace UndeadInterop
                 _dynamicsCache.Add(key, CreateDynamicDelegate(args));
             }
 
-            return PrepCall_Explicit(name, _dynamicsCache[key]);
+            return PrepCallExplicit(name, _dynamicsCache[key]);
         }
 
-        private static dynamic PrepCall_Explicit(string name, Type type)
+        private static dynamic PrepCallExplicit(string name, Type type)
         {
             if (!_delegateCache.ContainsKey(type))
             {
@@ -78,7 +78,7 @@ namespace UndeadInterop
 
         public static bool IsUserApiHooked()
         {
-            return GetFunctions().Count(x => x.GetHookType() != HookType.NONE) != 0;
+            return GetFunctions().Count(x => x.GetHookType() != HookType.None) != 0;
         }
 
         private static unsafe int GetIdentifier(string name)
@@ -88,7 +88,7 @@ namespace UndeadInterop
             if (function.Address == (byte*)0)
                 throw new ArgumentException($"{name} is not an export function");
 
-            return function.GetHookType() == HookType.FORWARDED
+            return function.GetHookType() == HookType.Forwarded
                 ? *(int*)(function.Address + sizeof(int))
                 : (function.IsSharedExport ? 0 : 4072) + _functionCache.IndexOf(function); /* may be inconsistent across versions? i hope not */
         }
