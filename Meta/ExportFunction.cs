@@ -4,12 +4,12 @@ namespace UndeadInterop.Meta
 {
     internal unsafe struct ExportFunction
     {
-        public readonly string Name { get; }
+        public readonly string? Name { get; }
         internal readonly byte* Address { get; }
         internal readonly ProcessModule Module { get; }
         public bool IsSharedExport { get; set; }
 
-        public ExportFunction(string name, byte* address, ProcessModule module)
+        public ExportFunction(string? name, byte* address, ProcessModule module)
         {
             Name = name;
             Address = address;
