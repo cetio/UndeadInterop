@@ -10,7 +10,7 @@ namespace UndeadInterop
     public class NtApi
     {
         [DllImport("kernel32.dll")]
-        private static extern uint VirtualAlloc(nint lpStartAddr, int size, uint flAllocationType, uint flProtect);
+        private static extern bool VirtualProtect(nint lpAddress, int dwSize, uint flNewProtect, out uint lpflOldProtect);
 
         private static readonly Func<Type[], Type> CreateDynamicDelegate = (Func<Type[], Type>)Delegate.CreateDelegate(typeof(Func<Type[], Type>),
             typeof(Expression).Assembly.GetType("System.Linq.Expressions.Compiler.DelegateHelpers")!
@@ -67,7 +67,8 @@ namespace UndeadInterop
                 byte[] shellcode = GenerateShellcode(name);
                 nint shellcodeAddress = Marshal.UnsafeAddrOfPinnedArrayElement(shellcode, 0);
 
-                VirtualAlloc(shellcodeAddress, 14, 0x1000, 0x40);
+                if (!VirtualProtect(shellcodeAddress, 14, 0x40, out _))
+                    throw new InvalidOperationException("Failed to mark shellcode memory as executable");
 
                 Delegate @delegate = Marshal.GetDelegateForFunctionPointer(shellcodeAddress, type);
                 _delegateCache.Add(type, @delegate);

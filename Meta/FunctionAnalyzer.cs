@@ -24,6 +24,7 @@ namespace UndeadInterop.Meta
 
         public static unsafe List<FunctionBlock> ReadInstructions(this ExportFunction function)
         {
+            forwardBranches.Clear();
             List<FunctionBlock> blocks = new List<FunctionBlock>();
             ReadInstructions(function.Address, function.Module, blocks);
 
@@ -45,7 +46,7 @@ namespace UndeadInterop.Meta
 
             // Create a buffer for instructions
             List<Instruction> buffer = new List<Instruction>();
-            Decoder decoder = Decoder.Create(64, new Span<byte>(address, 512).ToArray());
+            Decoder decoder = Decoder.Create(64, new Span<byte>(address, 512).ToArray(), (ulong)address);
 
             // Check if the address is forwarded (outside the module's memory range)
             if (IsForwarded(module, address))
@@ -58,7 +59,7 @@ namespace UndeadInterop.Meta
             }
 
             // Decode instructions until the buffer is full or the last instruction is a leading instruction
-            while (decoder.IP < 512 && !buffer.LastOrDefault().IsLeading())
+            while (decoder.IP < (ulong)address + 512 && !buffer.LastOrDefault().IsLeading())
             {
                 decoder.Decode(out Instruction instruction);
                 buffer.Add(instruction);
@@ -80,7 +81,7 @@ namespace UndeadInterop.Meta
                     instruction.GetTargetAddress() != 0 &&
                     instruction != source)
                 {
-                    ReadInstructions(address + instruction.GetTargetAddress(), module, blocks, instruction);
+                    ReadInstructions((byte*)instruction.GetTargetAddress(), module, blocks, instruction);
                 }
             }
         }
