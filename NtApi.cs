@@ -5,10 +5,10 @@ using System.Runtime.InteropServices;
 using UndeadInterop.Meta;
 using UndeadInterop.Meta.Hooking;
 
-namespace UndeadInterop
+namespace UndeadInterop;
+
+public class NtApi
 {
-    public class NtApi
-    {
         [DllImport("kernel32.dll")]
         private static extern bool VirtualProtect(nint lpAddress, int dwSize, uint flNewProtect, out uint lpflOldProtect);
 
@@ -201,4 +201,3 @@ namespace UndeadInterop
             return shellcode;
         }
     }
-}

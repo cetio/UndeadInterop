@@ -1,7 +1,7 @@
-﻿namespace UndeadInterop
+﻿namespace UndeadInterop;
+
+public enum NtStatus : uint
 {
-    public enum NtStatus : uint
-    {
         Success = 0x00000000,
         Wait1 = 0x00000001,
         Wait2 = 0x00000002,
@@ -335,6 +335,5 @@
         TransactionRequiredPromotion = 0xc0190043,
         CannotExecuteFileInTransaction = 0xc0190044,
         TransactionsNotFrozen = 0xc0190045,
-        MaximumNtStatus = 0xffffffff
-    }
+    MaximumNtStatus = 0xffffffff
 }

@@ -2,10 +2,10 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace UndeadInterop.Meta
+namespace UndeadInterop.Meta;
+
+internal static class FunctionAnalyzer
 {
-    internal static class FunctionAnalyzer
-    {
         [DllImport("kernel32.dll")]
         private static extern unsafe int VirtualQuery(byte* lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, int dwLength);
 
@@ -142,4 +142,3 @@ namespace UndeadInterop.Meta
                 : instruction.FarBranchSelector;
         }
     }
-}

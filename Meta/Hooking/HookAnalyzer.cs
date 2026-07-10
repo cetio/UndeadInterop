@@ -1,9 +1,9 @@
 ﻿using Iced.Intel;
 
-namespace UndeadInterop.Meta.Hooking
+namespace UndeadInterop.Meta.Hooking;
+
+internal static class HookAnalyzer
 {
-    internal static class HookAnalyzer
-    {
         public static unsafe HookType GetHookType(this ExportFunction function)
         {
             HookType hookType = HookType.None;
@@ -62,4 +62,3 @@ namespace UndeadInterop.Meta.Hooking
             return hookType;
         }
     }
-}
