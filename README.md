@@ -8,7 +8,7 @@
 
 > [!CAUTION]
 >
-> UndeadInterop reads export and syscall data directly from the in-memory copy of `ntdll.dll`/`win32u.dll` rather than cloning a pristine copy from the filesystem. This means a tampered export table can influence syscall ID resolution and hook classification.
+> By default, UndeadInterop reads export and syscall data directly from the in-memory copy of `ntdll.dll`/`win32u.dll` rather than cloning a pristine copy from the filesystem. This means a tampered export table can influence syscall ID resolution and hook classification. Enable filesystem cloning (see below) to mitigate this.
 
 UndeadInterop is a C# library for reading PE and module data from a running process, primarily its own, to resolve `ntdll.dll`/`win32u.dll` syscall IDs and invoke them directly. It also inspects usermode functions for hooks, covering inline jumps and calls, stack pivots, debug interrupts, and forwarded exports.
 
@@ -19,7 +19,7 @@ It started after reading secret.club's writeup on BattlEye's usermode API hooks 
 - **Export walking** - Parses the PE export directory of a loaded module to enumerate `Nt*`/`Zw*` functions without relying on static offsets
 - **Syscall resolution** - Derives syscall IDs from export order, falling back to forwarded addresses when present
 - **Direct syscalls** - Generates small shellcode stubs at runtime and marshals them to typed delegates, so syscalls can be called like normal .NET methods
-- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.InlineJmp`, `InlineCall`, `Returning`, `DebugInt`, `DebugPrk`, or `Forwarded`
+- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.InlineJmp`, `InlineCall`, `Returning`, `DebugInt`, `DebugPrk`, `Tamper`, or `Forwarded`
 - **Shared export handling** - Tracks `Nt`/`Zw` pairs so identifiers stay consistent with the real syscall table
 
 ## Usage
@@ -59,16 +59,29 @@ if (NtApi.IsUserApiHooked())
 }
 ```
 
+### Filesystem Cloning
+
+By default, UndeadInterop reads from the in-memory module copy. Enable filesystem cloning to resolve syscall IDs and compare hook data against a pristine on-disk copy:
+
+```csharp
+NtApi.UseCloneForSyscalls = true;  // resolve syscall IDs from the clone
+NtApi.UseCloneForHooks = true;     // compare hook data against the clone
+NtApi.ClonePath = null;            // defaults to Environment.SystemDirectory
+```
+
+When `UseCloneForHooks` is enabled, functions whose bytes differ from the clone without a specific hook being classified will return `HookType.Tamper`.
+
 ## Architecture
 
 - `NtApi.cs` - Export enumeration, syscall ID resolution, shellcode generation, and delegate caching
 - `NtImport.cs` - Attribute used to mark a delegate as a syscall import
 - `NtStatus.cs` - NTSTATUS values returned by native calls
 - `Meta/ExportData.cs`/`Meta/ExportFunction.cs` - Raw PE export directory data and per-function records
+- `Meta/ModuleMap.cs` - Abstracts over live and cloned modules with base address, size, and name
 - `Meta/FunctionAnalyzer.cs`/`Meta/FunctionBlock.cs` - Disassembles a function's code region into instruction blocks for analysis
 - `Meta/Hooking/HookAnalyzer.cs`/`Meta/Hooking/HookType.cs` - Classifies hook types from the disassembled instructions
 
-Targets `net6.0`, Windows only, x64 (the generated syscall stub is x86_64 only), and depends on [Iced](https://github.com/icedland/iced) for disassembly.
+Targets `net8.0`, Windows only, x64 (the generated syscall stub is x86_64 only), and depends on [Iced](https://github.com/icedland/iced) for disassembly.
 
 ## License
 

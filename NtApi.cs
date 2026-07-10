@@ -14,14 +14,24 @@ public class NtApi
         [DllImport("kernel32.dll")]
         private static extern bool VirtualProtect(nint lpAddress, int dwSize, uint flNewProtect, out uint lpflOldProtect);
 
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern nint LoadLibraryEx(string lpLibFileName, nint hFile, uint dwFlags);
+
+        private const uint LOAD_LIBRARY_AS_IMAGE_RESOURCE = 0x20;
+
         private static readonly Func<Type[], Type> CreateDynamicDelegate = (Func<Type[], Type>)Delegate.CreateDelegate(typeof(Func<Type[], Type>),
             typeof(Expression).Assembly.GetType("System.Linq.Expressions.Compiler.DelegateHelpers")!
             .GetMethod("MakeNewCustomDelegate", BindingFlags.NonPublic | BindingFlags.Static)!);
 
-        // TODO: Add configurability for cloning modules from the filesystem instead of reading the in-memory copy, affecting hook detection and syscall execution
-        private static List<ExportFunction> _functionCache = new List<ExportFunction>();
-        private static Dictionary<Type, Delegate> _delegateCache = new Dictionary<Type, Delegate>();
-        private static Dictionary<string, Type> _dynamicsCache = new Dictionary<string, Type>();
+        public static bool UseCloneForSyscalls { get; set; }
+        public static bool UseCloneForHooks { get; set; }
+        public static string? ClonePath { get; set; }
+
+        private static List<ExportFunction> _functionCache = new();
+        private static List<ExportFunction> _cloneFunctionCache = new();
+        private static Dictionary<string, ModuleMap> _cloneCache = new();
+        private static Dictionary<Type, Delegate> _delegateCache = new();
+        private static Dictionary<string, Type> _dynamicsCache = new();
 
         /// <summary>
         /// Prepares the syscall associated with a compile-time delegate.
@@ -80,19 +90,25 @@ public class NtApi
 
         public static bool IsUserApiHooked()
         {
-            return GetFunctions().Count(x => x.GetHookType() != HookType.None) != 0;
+            var cloneFunctions = UseCloneForHooks ? GetCloneFunctions() : null;
+            return GetFunctions().Count(x =>
+            {
+                var cloneFunc = cloneFunctions?.FirstOrDefault(c => c.Name == x.Name);
+                return x.GetHookType(cloneFunc) != HookType.None;
+            }) != 0;
         }
 
         private static unsafe int GetIdentifier(string name)
         {
-            ExportFunction function = GetFunctions().Where(x => x.Name == name).FirstOrDefault();
+            var cache = UseCloneForSyscalls ? GetCloneFunctions() : GetFunctions();
+            ExportFunction function = cache.Where(x => x.Name == name).FirstOrDefault();
 
             if (function.Address == (byte*)0)
                 throw new ArgumentException($"{name} is not an export function");
 
             return function.GetHookType() == HookType.Forwarded
                 ? *(int*)(function.Address + sizeof(int))
-                : (function.IsSharedExport ? 0 : 4072) + _functionCache.IndexOf(function); /* may be inconsistent across versions? i hope not */
+                : (function.IsSharedExport ? 0 : 4072) + cache.IndexOf(function); /* may be inconsistent across versions? i hope not */
         }
 
         private static unsafe List<ExportFunction> GetFunctions()
@@ -106,46 +122,91 @@ public class NtApi
 
             foreach (ProcessModule module in modules)
             {
-                var exportData = GetExportData(module);
-
-                for (var i = 0; i < exportData.NumberOfNames; i++)
-                {
-                    ExportFunction function = BuildFunction(module, exportData.OrdinalBase, exportData.FunctionsRva,
-                        exportData.NamesRva, exportData.OrdinalsRva, i);
-
-                    if (function.Name is null)
-                        continue;
-
-                    if (function.Name.StartsWith("Zw"))
-                    {
-                        var ntName = "Nt" + function.Name.Remove(0, 2);
-                        var ntFunction = _functionCache.FirstOrDefault(x => x.Name == ntName);
-                        if (ntFunction.Name is not null)
-                        {
-                            var sharedIndex = _functionCache.IndexOf(ntFunction);
-                            var sharedExport = _functionCache[sharedIndex];
-                            sharedExport.IsSharedExport = true;
-
-                            _functionCache[sharedIndex] = sharedExport;
-                        }
-                        continue;
-                    }
-
-                    _functionCache.Add(function);
-                }
+                var moduleMap = new ModuleMap(module.BaseAddress, module.ModuleMemorySize, module.ModuleName);
+                PopulateFunctions(moduleMap, _functionCache);
             }
 
             _functionCache = _functionCache.OrderBy(x => (nint)x.Address).ToList();
             return _functionCache;
         }
 
-        private static ExportData GetExportData(ProcessModule module)
+        private static unsafe List<ExportFunction> GetCloneFunctions()
+        {
+            if (_cloneFunctionCache.Count != 0)
+                return _cloneFunctionCache;
+
+            string[] moduleNames = { "ntdll.dll", "win32u.dll" };
+
+            foreach (var moduleName in moduleNames)
+            {
+                if (!_cloneCache.TryGetValue(moduleName, out var cloneMap))
+                {
+                    cloneMap = LoadClone(moduleName);
+                    _cloneCache[moduleName] = cloneMap;
+                }
+
+                PopulateFunctions(cloneMap, _cloneFunctionCache);
+            }
+
+            _cloneFunctionCache = _cloneFunctionCache.OrderBy(x => (nint)x.Address).ToList();
+            return _cloneFunctionCache;
+        }
+
+        private static ModuleMap LoadClone(string moduleName)
+        {
+            string path = Path.Combine(ClonePath ?? Environment.SystemDirectory, moduleName);
+            nint hModule = LoadLibraryEx(path, nint.Zero, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+
+            if (hModule == nint.Zero)
+                throw new InvalidOperationException($"Failed to load clone of {moduleName}");
+
+            nint baseAddress = hModule & ~(nint)1;
+            int peHeader = Marshal.ReadInt32(baseAddress + 0x3C);
+            nint optHeader = baseAddress + peHeader + 0x18;
+            int sizeOfImage = Marshal.ReadInt32(optHeader + 0x38);
+
+            return new ModuleMap(baseAddress, sizeOfImage, moduleName);
+        }
+
+        private static unsafe void PopulateFunctions(ModuleMap module, List<ExportFunction> cache)
+        {
+            var exportData = GetExportData(module);
+
+            for (var i = 0; i < exportData.NumberOfNames; i++)
+            {
+                ExportFunction function = BuildFunction(module, exportData.OrdinalBase, exportData.FunctionsRva,
+                    exportData.NamesRva, exportData.OrdinalsRva, i, exportData.ExportRva, exportData.ExportSize);
+
+                if (function.Name is null)
+                    continue;
+
+                if (function.Name.StartsWith("Zw"))
+                {
+                    var ntName = "Nt" + function.Name.Remove(0, 2);
+                    var ntFunction = cache.FirstOrDefault(x => x.Name == ntName);
+                    if (ntFunction.Name is not null)
+                    {
+                        var sharedIndex = cache.IndexOf(ntFunction);
+                        var sharedExport = cache[sharedIndex];
+                        sharedExport.IsSharedExport = true;
+
+                        cache[sharedIndex] = sharedExport;
+                    }
+                    continue;
+                }
+
+                cache.Add(function);
+            }
+        }
+
+        private static ExportData GetExportData(ModuleMap module)
         {
             var peHeader = Marshal.ReadInt32(module.BaseAddress + 0x3C);
             var optHeader = module.BaseAddress + peHeader + 0x18;
             var magic = Marshal.ReadInt16(optHeader);
             var pExport = magic == 0x010b ? optHeader + 0x60 : optHeader + 0x70;
             var exportRva = Marshal.ReadInt32(pExport);
+            var exportSize = Marshal.ReadInt32(pExport + 4);
             var ordinalBase = Marshal.ReadInt32(module.BaseAddress + exportRva + 0x10);
             var numberOfNames = Marshal.ReadInt32(module.BaseAddress + exportRva + 0x18);
             var functionsRva = Marshal.ReadInt32(module.BaseAddress + exportRva + 0x1C);
@@ -158,22 +219,26 @@ public class NtApi
                 NumberOfNames = numberOfNames,
                 FunctionsRva = functionsRva,
                 NamesRva = namesRva,
-                OrdinalsRva = ordinalsRva
+                OrdinalsRva = ordinalsRva,
+                ExportRva = exportRva,
+                ExportSize = exportSize
             };
         }
 
-        private static unsafe ExportFunction BuildFunction(ProcessModule module, int ordinalBase, int functionsRva, int namesRva, int ordinalsRva, int index)
+        private static unsafe ExportFunction BuildFunction(ModuleMap module, int ordinalBase, int functionsRva, int namesRva, int ordinalsRva, int index, int exportDirRva, int exportDirSize)
         {
             var functionOrdinal = Marshal.ReadInt16(module.BaseAddress + ordinalsRva + index * 2) + ordinalBase;
             var functionRva = Marshal.ReadInt32(module.BaseAddress + functionsRva + 4 * (functionOrdinal - ordinalBase));
             var functionAddr = (byte*)module.BaseAddress + functionRva;
             var functionName = Marshal.PtrToStringAnsi(module.BaseAddress + Marshal.ReadInt32(module.BaseAddress + namesRva + index * 4));
 
+            bool isForwarded = functionRva >= exportDirRva && functionRva < exportDirRva + exportDirSize;
+
             if (!string.IsNullOrWhiteSpace(functionName) &&
                 (functionName.StartsWith("Nt") || functionName.StartsWith("Zw")) &&
                 char.IsUpper(functionName[2]))
             {
-                return new ExportFunction(functionName, functionAddr, module);
+                return new ExportFunction(functionName, functionAddr, module, isForwarded);
             }
 
             return new ExportFunction(null, (byte*)0, module);

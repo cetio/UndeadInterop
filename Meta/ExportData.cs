@@ -7,4 +7,6 @@ internal class ExportData
     public int FunctionsRva { get; set; }
     public int NamesRva { get; set; }
     public int OrdinalsRva { get; set; }
+    public int ExportRva { get; set; }
+    public int ExportSize { get; set; }
 }

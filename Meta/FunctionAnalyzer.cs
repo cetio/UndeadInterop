@@ -1,5 +1,4 @@
 ﻿using Iced.Intel;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace UndeadInterop.Meta;
@@ -31,7 +30,7 @@ internal static class FunctionAnalyzer
             return blocks;
         }
 
-        private static unsafe void ReadInstructions(byte* address, ProcessModule module, List<FunctionBlock> blocks, Instruction? source = null)
+        private static unsafe void ReadInstructions(byte* address, ModuleMap module, List<FunctionBlock> blocks, Instruction? source = null)
         {
             // Determine the function block name based on the source instruction
             string name = source == null ? "main" : "loc-" + ((Instruction)source).GetTargetAddress().ToString("X8");
@@ -86,7 +85,7 @@ internal static class FunctionAnalyzer
             }
         }
 
-        private static unsafe bool IsForwarded(ProcessModule module, byte* address)
+        private static unsafe bool IsForwarded(ModuleMap module, byte* address)
         {
             return (nint)address - module.BaseAddress > module.ModuleMemorySize ||
                 (nint)address - module.BaseAddress < 0;

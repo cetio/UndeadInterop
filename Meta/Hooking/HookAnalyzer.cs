@@ -1,11 +1,15 @@
 ﻿using Iced.Intel;
+using UndeadInterop.Meta;
 
 namespace UndeadInterop.Meta.Hooking;
 
 internal static class HookAnalyzer
 {
-    public static unsafe HookType GetHookType(this ExportFunction function)
+    public static unsafe HookType GetHookType(this ExportFunction function, ExportFunction? cloneFunction = null)
     {
+        if (function.IsForwardedExport)
+            return HookType.Forwarded;
+
         HookType hookType = HookType.None;
         List<FunctionBlock> blocks = function.ReadInstructions();
 
@@ -56,6 +60,21 @@ internal static class HookAnalyzer
                 {
                     hookType = HookType.DebugPrk;
                 }
+            }
+        }
+
+        if (hookType == HookType.None && cloneFunction is not null)
+        {
+            int liveRva = (int)((nint)function.Address - function.Module.BaseAddress);
+            int cloneRva = (int)((nint)cloneFunction.Value.Address - cloneFunction.Value.Module.BaseAddress);
+
+            if (liveRva != cloneRva)
+                return HookType.Forwarded;
+
+            for (int i = 0; i < 512; i++)
+            {
+                if (function.Address[i] != cloneFunction.Value.Address[i])
+                    return HookType.Tamper;
             }
         }
 
