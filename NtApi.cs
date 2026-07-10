@@ -2,8 +2,10 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Iced.Intel;
 using UndeadInterop.Meta;
 using UndeadInterop.Meta.Hooking;
+using static Iced.Intel.AssemblerRegisters;
 
 namespace UndeadInterop;
 
@@ -66,7 +68,7 @@ public class NtApi
                 byte[] shellcode = GenerateShellcode(name);
                 nint shellcodeAddress = Marshal.UnsafeAddrOfPinnedArrayElement(shellcode, 0);
 
-                if (!VirtualProtect(shellcodeAddress, 14, 0x40, out _))
+                if (!VirtualProtect(shellcodeAddress, shellcode.Length, 0x40, out _))
                     throw new InvalidOperationException("Failed to mark shellcode memory as executable");
 
                 Delegate @delegate = Marshal.GetDelegateForFunctionPointer(shellcodeAddress, type);
@@ -179,27 +181,20 @@ public class NtApi
 
         private static byte[] GenerateShellcode(string name)
         {
-            byte[] shellcode = GC.AllocateArray<byte>(14, true);
             int id = GetIdentifier(name);
 
-            // mov r10, rcx
-            shellcode[0] = 0x4c;
-            shellcode[1] = 0x8b;
-            shellcode[2] = 0xd1;
+            var assembler = new Assembler(64);
+            assembler.mov(r10, rcx);
+            assembler.mov(eax, id);
+            assembler.syscall();
+            assembler.ret();
 
-            // mov eax, id
-            shellcode[3] = 0xb8;
-            shellcode[4] = (byte)(id >> 0);  // byte 1
-            shellcode[5] = (byte)(id >> 8);  // byte 2
-            shellcode[6] = (byte)(id >> 16); // byte 3
-            shellcode[7] = (byte)(id >> 24); // byte 4
+            using var stream = new MemoryStream();
+            assembler.Assemble(new StreamCodeWriter(stream), 0);
 
-            // syscall eax
-            shellcode[8] = 0x0f;
-            shellcode[9] = 0x05;
-
-            // ret
-            shellcode[10] = 0xc3;
+            byte[] shellcode = GC.AllocateArray<byte>((int)stream.Length, true);
+            stream.Position = 0;
+            stream.Read(shellcode, 0, shellcode.Length);
 
             return shellcode;
         }
