@@ -31,8 +31,6 @@ public class NtApi
         {
             NtImport import = typeof(T).GetCustomAttribute<NtImport>()
                     ?? throw new ArgumentException("The provided delegate was not attributed with NtImport");
-            ExportFunction function = GetFunctions().Where(x => x.Name == (import.Entrypoint ?? typeof(T).Name)).FirstOrDefault();
-
             return (T)PrepCallExplicit(import.Entrypoint ?? typeof(T).Name, typeof(T));
         }
 
@@ -47,7 +45,7 @@ public class NtApi
         /// <exception cref="InvalidOperationException"></exception>
         public static dynamic PrepDynamic(string name, Type returnType, params Type[] parameterTypes)
         {
-            string key = name + returnType.Name + string.Join(", ", (object[])parameterTypes);
+            string key = name + returnType.FullName + string.Join(", ", parameterTypes.Select(t => t.FullName));
 
             if (!_dynamicsCache.ContainsKey(key))
             {
@@ -118,11 +116,16 @@ public class NtApi
 
                     if (function.Name.StartsWith("Zw"))
                     {
-                        var sharedIndex = _functionCache.IndexOf(_functionCache.Where(x => x.Name == "Nt" + function.Name.Remove(0, 2)).First());
-                        var sharedExport = _functionCache[sharedIndex];
-                        sharedExport.IsSharedExport = true;
+                        var ntName = "Nt" + function.Name.Remove(0, 2);
+                        var ntFunction = _functionCache.FirstOrDefault(x => x.Name == ntName);
+                        if (ntFunction.Name is not null)
+                        {
+                            var sharedIndex = _functionCache.IndexOf(ntFunction);
+                            var sharedExport = _functionCache[sharedIndex];
+                            sharedExport.IsSharedExport = true;
 
-                        _functionCache[sharedIndex] = sharedExport;
+                            _functionCache[sharedIndex] = sharedExport;
+                        }
                         continue;
                     }
 

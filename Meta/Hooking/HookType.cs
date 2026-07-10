@@ -5,9 +5,10 @@ public enum HookType
     None,
     InlineJmp,
     InlineCall,
-    Returning,
     DebugInt,
     DebugPrk,
+    DebugStep,
     // TODO: Forwarded is horribly broken until filesystem cloning is implemented
-    Forwarded
+    Forwarded,
+    Returning
 }
