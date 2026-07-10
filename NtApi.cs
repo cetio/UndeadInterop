@@ -16,6 +16,7 @@ namespace UndeadInterop
             typeof(Expression).Assembly.GetType("System.Linq.Expressions.Compiler.DelegateHelpers")!
             .GetMethod("MakeNewCustomDelegate", BindingFlags.NonPublic | BindingFlags.Static)!);
 
+        // TODO: Add configurability for cloning modules from the filesystem instead of reading the in-memory copy, affecting hook detection and syscall execution
         private static List<ExportFunction> _functionCache = new List<ExportFunction>();
         private static Dictionary<Type, Delegate> _delegateCache = new Dictionary<Type, Delegate>();
         private static Dictionary<string, Type> _dynamicsCache = new Dictionary<string, Type>();

@@ -6,6 +6,10 @@
 >
 > I don't really care what you do with this project, but please don't use it to be nefarious. Even if you do, it is not an effective way to avoid detection by any modern antivirus or anticheat, so you'd be pretty silly.
 
+> [!CAUTION]
+>
+> UndeadInterop reads export and syscall data directly from the in-memory copy of `ntdll.dll`/`win32u.dll` rather than cloning a pristine copy from the filesystem. This means a tampered export table can influence syscall ID resolution and hook classification.
+
 UndeadInterop is a C# library for reading PE and module data from a running process, primarily its own, to resolve `ntdll.dll`/`win32u.dll` syscall IDs and invoke them directly. It also inspects usermode functions for hooks, covering inline jumps and calls, stack pivots, debug interrupts, and forwarded exports.
 
 It started after reading secret.club's writeup on BattlEye's usermode API hooks and grew into a hook detection tool and PInvoke-style syscall wrapper. It was originally the backend for UndeadHotkeys, a frontend for designing macros that never went public and no longer has any surviving source.
@@ -15,7 +19,7 @@ It started after reading secret.club's writeup on BattlEye's usermode API hooks 
 - **Export walking** - Parses the PE export directory of a loaded module to enumerate `Nt*`/`Zw*` functions without relying on static offsets
 - **Syscall resolution** - Derives syscall IDs from export order, falling back to forwarded addresses when present
 - **Direct syscalls** - Generates small shellcode stubs at runtime and marshals them to typed delegates, so syscalls can be called like normal .NET methods
-- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.InlineJmp`, `InlineCall`, `InlineWarp`, `DebugInt`, `DebugPrk`, or `Forwarded`
+- **Hook detection** - Disassembles a function's prologue with Iced and classifies the control flow into `HookType.InlineJmp`, `InlineCall`, `Returning`, `DebugInt`, `DebugPrk`, or `Forwarded`
 - **Shared export handling** - Tracks `Nt`/`Zw` pairs so identifiers stay consistent with the real syscall table
 
 ## Usage

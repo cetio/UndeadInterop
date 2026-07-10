@@ -5,9 +5,10 @@
         None,
         InlineJmp,
         InlineCall,
-        InlineWarp,
+        Returning,
         DebugInt,
         DebugPrk,
+        // TODO: Forwarded is horribly broken until filesystem cloning is implemented
         Forwarded
     }
 }

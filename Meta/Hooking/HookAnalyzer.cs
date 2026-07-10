@@ -43,7 +43,7 @@ namespace UndeadInterop.Meta.Hooking
                         instruction.MemoryDisplacement64 >= 8 &&
                         instruction.MemoryDisplacement64 <= 24))
                     {
-                        hookType = HookType.InlineWarp;
+                        hookType = HookType.Returning;
                     }
                     // instruction forces an interrupt
                     else if (instruction.FlowControl == FlowControl.Interrupt &&
