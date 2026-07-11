@@ -10,7 +10,6 @@ public enum HookType
     DebugInt,
     DebugPrk,
     DebugStep,
-    // TODO: Forwarded is horribly broken until filesystem cloning is implemented
     Forwarded,
     Returning
 }
